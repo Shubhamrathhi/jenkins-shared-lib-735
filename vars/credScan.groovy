@@ -1,4 +1,3 @@
-// vars/credScan.groovy
 def call(Map config = [:]) {
     def reportFile = config.reportFile ?: "gitleaks-report.json"
     def exitCodeFile = "exit_code.txt"
@@ -13,20 +12,21 @@ def call(Map config = [:]) {
         gitleaks version
     '''
 
-    // 2️⃣ Run Gitleaks scan
+    // 2️⃣ Run Gitleaks scan in the Jenkins workspace (repo root)
     echo "Running Gitleaks Scan..."
     sh """
+        cd ${env.WORKSPACE}
         gitleaks detect --source . --report-path ${reportFile} || echo \$? > ${exitCodeFile}
         test -f ${exitCodeFile} || echo 0 > ${exitCodeFile}
     """
 
     // 3️⃣ Archive the report
-    archiveArtifacts artifacts: reportFile, fingerprint: true
-    archiveArtifacts artifacts: exitCodeFile, fingerprint: true
+    archiveArtifacts artifacts: "${env.WORKSPACE}/${reportFile}", fingerprint: true
+    archiveArtifacts artifacts: "${env.WORKSPACE}/${exitCodeFile}", fingerprint: true
 
     // 4️⃣ Validate result
     script {
-        def exitCode = readFile(exitCodeFile).trim()
+        def exitCode = readFile("${env.WORKSPACE}/${exitCodeFile}").trim()
         if (exitCode != "0") {
             currentBuild.result = "FAILURE"
             error("❌ Secrets detected! Exit code: ${exitCode}")
